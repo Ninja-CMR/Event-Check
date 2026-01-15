@@ -2,7 +2,7 @@
 import { ref, reactive } from 'vue'
 import { useGuestStore } from '@/stores/guestStore'
 import QrcodeVue from 'qrcode.vue'
-import { CheckCircle2, Download, UserPlus, Mail, User } from 'lucide-vue-next'
+import { CheckCircle2, Download, UserPlus, Mail, User, Copy, Check } from 'lucide-vue-next'
 
 const guestStore = useGuestStore()
 const form = reactive({
@@ -12,18 +12,30 @@ const form = reactive({
 })
 
 const registeredGuest = ref(null)
-const qrRef = ref(null)
 const isSubmitting = ref(false)
+const copied = ref(false)
 
 const handleRegister = async () => {
   if (!form.firstName || !form.lastName || !form.email) return
   
   isSubmitting.value = true
-  // Simuler un petit délai
   await new Promise(resolve => setTimeout(resolve, 800))
   
   registeredGuest.value = guestStore.registerGuest(form.firstName, form.lastName, form.email)
   isSubmitting.value = false
+}
+
+const copyId = async () => {
+  try {
+    const partialId = registeredGuest.value.id.substring(0, 8)
+    await navigator.clipboard.writeText(partialId)
+    copied.value = true
+    setTimeout(() => {
+      copied.value = false
+    }, 2000)
+  } catch (err) {
+    console.error('Failed to copy!', err)
+  }
 }
 
 const downloadQR = () => {
@@ -41,6 +53,7 @@ const resetForm = () => {
   form.firstName = ''
   form.lastName = ''
   form.email = ''
+  copied.value = false
 }
 </script>
 
@@ -124,8 +137,18 @@ const resetForm = () => {
           class="rounded-lg shadow-sm"
           render-as="canvas"
         />
-        <div class="absolute -bottom-3 left-1/2 -translate-x-1/2 bg-white px-3 py-1 rounded-full border shadow-sm text-[10px] font-bold text-gray-400 uppercase tracking-widest">
-          ID: {{ registeredGuest.id.substring(0, 8) }}
+        <div class="absolute -bottom-3 left-1/2 -translate-x-1/2 flex items-center gap-2">
+          <div class="bg-white px-3 py-1 rounded-full border shadow-sm text-[10px] font-bold text-gray-500 uppercase tracking-widest flex items-center gap-1.5">
+            ID: <span class="font-mono">{{ registeredGuest.id.substring(0, 8) }}</span>
+          </div>
+          <button 
+            @click="copyId"
+            class="p-1.5 bg-white rounded-full border shadow-sm hover:bg-gray-50 transition-colors text-gray-400 hover:text-primary-600"
+            :title="copied ? 'Copié !' : 'Copier l\'ID'"
+          >
+            <Check v-if="copied" class="w-3.5 h-3.5 text-green-500" />
+            <Copy v-else class="w-3.5 h-3.5" />
+          </button>
         </div>
       </div>
       

@@ -24,7 +24,9 @@ export const useGuestStore = defineStore('guest', {
         },
 
         checkInGuest(guestId) {
-            const guest = this.guests.find(g => g.id === guestId)
+            const cleanId = guestId.trim()
+            // Recherche par ID complet ou par les 8 premiers caractères (ce qui est affiché à l'utilisateur)
+            const guest = this.guests.find(g => g.id === cleanId || g.id.substring(0, 8) === cleanId)
 
             if (!guest) {
                 this.currentScanResult = {
