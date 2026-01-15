@@ -2,15 +2,18 @@
 import { onMounted, onUnmounted, ref } from 'vue'
 import { Html5Qrcode } from 'html5-qrcode'
 import { useGuestStore } from '@/stores/guestStore'
+import { usePinAuth } from '@/composables/usePinAuth'
 import ResultModal from '@/components/ResultModal.vue'
-import { Camera, Users, History, RefreshCcw, CheckCircle2 } from 'lucide-vue-next'
+import { Camera, Users, History, RefreshCcw, CheckCircle2, Lock, LogOut } from 'lucide-vue-next'
 
 const guestStore = useGuestStore()
+const { isAuthenticated, pinError, authenticate, logout } = usePinAuth()
 const html5QrCode = ref(null)
 const isScanning = ref(false)
 const scannerError = ref(null)
 const manualId = ref('')
 const showManualInput = ref(false)
+const pinInput = ref('')
 
 const onScanSuccess = async (decodedText) => {
   console.log('QR Code détecté:', decodedText)
@@ -58,9 +61,25 @@ const checkInManual = () => {
   showManualInput.value = false
 }
 
+const handlePinSubmit = () => {
+  if (authenticate(pinInput.value)) {
+    pinInput.value = ''
+  }
+}
+
+const handleLogout = () => {
+  logout()
+  if (html5QrCode.value && html5QrCode.value.isScanning) {
+    html5QrCode.value.stop().catch(err => console.error(err))
+  }
+  isScanning.value = false
+}
+
 onMounted(() => {
   guestStore.fetchGuests()
-  startScanner()
+  if (isAuthenticated.value) {
+    startScanner()
+  }
 })
 
 onUnmounted(async () => {
@@ -83,7 +102,52 @@ const scannedCount = ref(guestStore.guests.filter(g => g.scanned).length)
 </script>
 
 <template>
-  <div class="py-6 space-y-6">
+  <!-- PIN Authentication Modal -->
+  <div v-if="!isAuthenticated" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+    <div class="bg-white rounded-3xl shadow-2xl max-w-md w-full p-8 space-y-6 animate-fade-in">
+      <div class="text-center">
+        <div class="w-16 h-16 bg-primary-100 text-primary-600 rounded-full flex items-center justify-center mx-auto mb-4">
+          <Lock class="w-8 h-8" />
+        </div>
+        <h2 class="text-2xl font-bold text-gray-900 mb-2">Accès Restreint</h2>
+        <p class="text-gray-600 text-sm">
+          Cette page est réservée au personnel autorisé.<br />
+          Veuillez entrer votre code PIN pour continuer.
+        </p>
+      </div>
+
+      <form @submit.prevent="handlePinSubmit" class="space-y-4">
+        <div>
+          <label class="block text-sm font-semibold text-gray-700 mb-2">Code PIN</label>
+          <input 
+            v-model="pinInput"
+            type="password"
+            inputmode="numeric"
+            pattern="[0-9]*"
+            maxlength="6"
+            placeholder="••••"
+            autofocus
+            class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all outline-none text-center text-2xl font-bold tracking-widest"
+            @input="pinError = ''"
+          />
+          <p v-if="pinError" class="mt-2 text-sm text-red-600 font-medium">{{ pinError }}</p>
+        </div>
+
+        <button 
+          type="submit"
+          class="w-full gradient-bg text-white py-4 rounded-xl font-bold text-lg shadow-lg hover:shadow-primary-200/50 hover:scale-[1.02] active:scale-[0.98] transition-all"
+        >
+          Déverrouiller
+        </button>
+      </form>
+
+      <p class="text-xs text-center text-gray-400 italic">
+        Si vous êtes un participant, veuillez vous inscrire sur la page d'accueil.
+      </p>
+    </div>
+  </div>
+
+  <div v-else class="py-6 space-y-6">
     <!-- Header Stats -->
     <div class="flex gap-4">
       <div class="flex-1 bg-white p-4 rounded-2xl shadow-sm border border-gray-100 flex items-center gap-3">
@@ -114,10 +178,19 @@ const scannedCount = ref(guestStore.guests.filter(g => g.scanned).length)
           <Camera class="w-6 h-6 text-primary-600" />
           Scanner le QR Code
         </h2>
-        <span class="flex items-center gap-1.5 text-[10px] font-bold text-green-500 uppercase">
-          <span class="w-2 h-2 bg-green-500 rounded-full animate-ping"></span>
-          Live
-        </span>
+        <div class="flex items-center gap-3">
+          <span class="flex items-center gap-1.5 text-[10px] font-bold text-green-500 uppercase">
+            <span class="w-2 h-2 bg-green-500 rounded-full animate-ping"></span>
+            Live
+          </span>
+          <button 
+            @click="handleLogout"
+            class="p-2 hover:bg-gray-100 rounded-lg transition-colors text-gray-500 hover:text-red-600"
+            title="Déconnexion"
+          >
+            <LogOut class="w-5 h-5" />
+          </button>
+        </div>
       </div>
       
       <div class="p-4 bg-gray-900 aspect-square flex items-center justify-center relative">
