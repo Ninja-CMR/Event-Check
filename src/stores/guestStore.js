@@ -73,13 +73,17 @@ export const useGuestStore = defineStore('guest', {
         },
 
         async checkInGuest(guestId) {
+            console.log('[checkInGuest] Début, ID reçu:', guestId)
             const cleanId = guestId.trim()
+            console.log('[checkInGuest] ID nettoyé:', cleanId)
 
             // Find guest by full ID or first 8 characters
             let guest = this.guests.find(g => g.id === cleanId || g.id.substring(0, 8) === cleanId)
+            console.log('[checkInGuest] Invité trouvé localement:', guest ? `${guest.first_name} ${guest.last_name}` : 'NON')
 
             // If not in local state, try to fetch from database
             if (!guest) {
+                console.log('[checkInGuest] Recherche dans Supabase...')
                 try {
                     const { data } = await supabase
                         .from('guests')
@@ -89,17 +93,21 @@ export const useGuestStore = defineStore('guest', {
 
                     if (data) {
                         guest = data
+                        console.log('[checkInGuest] Invité trouvé dans Supabase:', `${guest.first_name} ${guest.last_name}`)
                         // Add to local state if not present
                         if (!this.guests.find(g => g.id === guest.id)) {
                             this.guests.push(guest)
                         }
+                    } else {
+                        console.log('[checkInGuest] Aucun invité trouvé dans Supabase')
                     }
                 } catch (err) {
-                    console.error('Error fetching guest:', err)
+                    console.error('[checkInGuest] Erreur Supabase:', err)
                 }
             }
 
             if (!guest) {
+                console.log('[checkInGuest] ÉCHEC: Invité non trouvé')
                 this.currentScanResult = {
                     success: false,
                     message: 'Code invalide ou invité non trouvé.',
@@ -109,6 +117,7 @@ export const useGuestStore = defineStore('guest', {
             }
 
             if (guest.scanned) {
+                console.log('[checkInGuest] AVERTISSEMENT: Invité déjà scanné')
                 this.currentScanResult = {
                     success: false,
                     fullName: `${guest.first_name} ${guest.last_name}`,

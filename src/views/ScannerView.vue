@@ -12,9 +12,15 @@ const scannerError = ref(null)
 const manualId = ref('')
 const showManualInput = ref(false)
 
-const onScanSuccess = (decodedText) => {
-  if (guestStore.currentScanResult) return
-  guestStore.checkInGuest(decodedText)
+const onScanSuccess = async (decodedText) => {
+  console.log('QR Code détecté:', decodedText)
+  if (guestStore.currentScanResult) {
+    console.log('Modal déjà affichée, scan ignoré')
+    return
+  }
+  console.log('Appel de checkInGuest...')
+  await guestStore.checkInGuest(decodedText)
+  console.log('checkInGuest terminé, résultat:', guestStore.currentScanResult)
 }
 
 const startScanner = async () => {
