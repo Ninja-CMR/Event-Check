@@ -184,11 +184,11 @@ const scannedCount = ref(guestStore.guests.filter(g => g.scanned).length)
         >
           <div class="flex items-center gap-3">
             <div class="w-10 h-10 rounded-full bg-green-50 text-green-600 flex items-center justify-center font-bold">
-              {{ guest.firstName[0] }}{{ guest.lastName[0] }}
+              {{ guest.first_name?.[0] }}{{ guest.last_name?.[0] }}
             </div>
             <div>
-              <div class="font-bold text-sm">{{ guest.firstName }} {{ guest.lastName }}</div>
-              <div class="text-[10px] text-gray-400">{{ new Date(guest.scannedAt).toLocaleTimeString() }}</div>
+              <div class="font-bold text-sm">{{ guest.first_name }} {{ guest.last_name }}</div>
+              <div class="text-[10px] text-gray-400">{{ new Date(guest.scanned_at).toLocaleTimeString() }}</div>
             </div>
           </div>
           <div class="text-green-500">

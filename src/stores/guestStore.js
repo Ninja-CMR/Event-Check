@@ -6,7 +6,8 @@ export const useGuestStore = defineStore('guest', {
         guests: [],
         currentScanResult: null,
         loading: false,
-        error: null
+        error: null,
+        isOnline: true
     }),
 
     actions: {
@@ -21,9 +22,18 @@ export const useGuestStore = defineStore('guest', {
 
                 if (error) throw error
                 this.guests = data || []
+                this.isOnline = true
+                // Backup to localStorage
+                localStorage.setItem('event_guests_backup', JSON.stringify(this.guests))
             } catch (err) {
                 console.error('Error fetching guests:', err)
                 this.error = err.message
+                this.isOnline = false
+                // Fallback to localStorage
+                const backup = localStorage.getItem('event_guests_backup')
+                if (backup) {
+                    this.guests = JSON.parse(backup)
+                }
             } finally {
                 this.loading = false
             }
@@ -50,6 +60,8 @@ export const useGuestStore = defineStore('guest', {
 
                 // Add to local state
                 this.guests.unshift(data)
+                // Backup to localStorage
+                localStorage.setItem('event_guests_backup', JSON.stringify(this.guests))
                 return data
             } catch (err) {
                 console.error('Error registering guest:', err)
@@ -124,6 +136,9 @@ export const useGuestStore = defineStore('guest', {
                     this.guests[index].scanned = true
                     this.guests[index].scanned_at = new Date().toISOString()
                 }
+
+                // Backup to localStorage
+                localStorage.setItem('event_guests_backup', JSON.stringify(this.guests))
 
                 this.currentScanResult = {
                     success: true,
