@@ -12,6 +12,7 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "@supabase/supabase-js": "^2.90.1",
     "@vitejs/plugin-vue": "^6.0.3",
     "autoprefixer": "^10.4.23",
     "html5-qrcode": "^2.3.8",

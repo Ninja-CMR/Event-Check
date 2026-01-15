@@ -1,17 +1,29 @@
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useGuestStore } from '@/stores/guestStore'
 import { Search, UserCheck, UserPlus, Filter, X, ChevronRight, Mail, Calendar } from 'lucide-vue-next'
 
 const guestStore = useGuestStore()
 const searchQuery = ref('')
 const filterStatus = ref('all') // 'all', 'registered', 'scanned'
+let realtimeChannel = null
+
+onMounted(async () => {
+  await guestStore.fetchGuests()
+  realtimeChannel = guestStore.subscribeToGuests()
+})
+
+onUnmounted(() => {
+  if (realtimeChannel) {
+    realtimeChannel.unsubscribe()
+  }
+})
 
 const filteredGuests = computed(() => {
   return guestStore.guests.filter(guest => {
     const matchesSearch = 
-      guest.firstName.toLowerCase().includes(searchQuery.value.toLowerCase()) ||
-      guest.lastName.toLowerCase().includes(searchQuery.value.toLowerCase()) ||
+      guest.first_name.toLowerCase().includes(searchQuery.value.toLowerCase()) ||
+      guest.last_name.toLowerCase().includes(searchQuery.value.toLowerCase()) ||
       guest.email.toLowerCase().includes(searchQuery.value.toLowerCase()) ||
       guest.id.substring(0, 8).toLowerCase().includes(searchQuery.value.toLowerCase())
     
@@ -21,7 +33,7 @@ const filteredGuests = computed(() => {
       (filterStatus.value === 'scanned' && guest.scanned)
     
     return matchesSearch && matchesFilter
-  }).sort((a, b) => new Date(b.registeredAt) - new Date(a.registeredAt))
+  }).sort((a, b) => new Date(b.registered_at) - new Date(a.registered_at))
 })
 
 const stats = computed(() => ({
@@ -120,10 +132,10 @@ const clearSearch = () => {
               class="w-12 h-12 rounded-full flex items-center justify-center font-bold text-lg"
               :class="guest.scanned ? 'bg-green-100 text-green-600' : 'bg-primary-100 text-primary-600'"
             >
-              {{ guest.firstName[0] }}{{ guest.lastName[0] }}
+              {{ guest.first_name[0] }}{{ guest.last_name[0] }}
             </div>
             <div>
-              <div class="font-bold text-gray-900">{{ guest.firstName }} {{ guest.lastName }}</div>
+              <div class="font-bold text-gray-900">{{ guest.first_name }} {{ guest.last_name }}</div>
               <div class="flex items-center gap-1.5 text-xs text-gray-500">
                 <Mail class="w-3 h-3" />
                 {{ guest.email }}
@@ -145,15 +157,15 @@ const clearSearch = () => {
         <div v-if="guest.scanned" class="mt-3 pt-3 border-t border-gray-50 flex items-center justify-between text-[11px]">
           <div class="flex items-center gap-1.5 text-gray-500">
             <UserCheck class="w-3.5 h-3.5 text-green-500" />
-            Vérifié à {{ new Date(guest.scannedAt).toLocaleTimeString() }}
+            Vérifié à {{ new Date(guest.scanned_at).toLocaleTimeString() }}
           </div>
           <div class="text-gray-400">
-            {{ new Date(guest.scannedAt).toLocaleDateString() }}
+            {{ new Date(guest.scanned_at).toLocaleDateString() }}
           </div>
         </div>
         <div v-else class="mt-3 pt-3 border-t border-gray-50 flex items-center gap-1.5 text-[11px] text-gray-400">
           <Calendar class="w-3.5 h-3.5" />
-          Inscrit le {{ new Date(guest.registeredAt).toLocaleDateString() }}
+          Inscrit le {{ new Date(guest.registered_at).toLocaleDateString() }}
         </div>
       </div>
     </div>

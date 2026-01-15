@@ -19,10 +19,13 @@ const handleRegister = async () => {
   if (!form.firstName || !form.lastName || !form.email) return
   
   isSubmitting.value = true
-  await new Promise(resolve => setTimeout(resolve, 800))
-  
-  registeredGuest.value = guestStore.registerGuest(form.firstName, form.lastName, form.email)
-  isSubmitting.value = false
+  try {
+    registeredGuest.value = await guestStore.registerGuest(form.firstName, form.lastName, form.email)
+  } catch (err) {
+    alert('Erreur lors de l\'inscription. Vérifiez votre connexion.')
+  } finally {
+    isSubmitting.value = false
+  }
 }
 
 const copyId = async () => {

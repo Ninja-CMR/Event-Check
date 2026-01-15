@@ -53,6 +53,7 @@ const checkInManual = () => {
 }
 
 onMounted(() => {
+  guestStore.fetchGuests()
   startScanner()
 })
 

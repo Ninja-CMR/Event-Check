@@ -1,32 +1,91 @@
 import { defineStore } from 'pinia'
-import { v4 as uuidv4 } from 'uuid'
+import { supabase } from '@/supabase'
 
 export const useGuestStore = defineStore('guest', {
     state: () => ({
-        guests: JSON.parse(localStorage.getItem('event_guests')) || [],
+        guests: [],
         currentScanResult: null,
+        loading: false,
+        error: null
     }),
 
     actions: {
-        registerGuest(firstName, lastName, email) {
-            const newGuest = {
-                id: uuidv4(),
-                firstName,
-                lastName,
-                email,
-                scanned: false,
-                registeredAt: new Date().toISOString()
-            }
+        async fetchGuests() {
+            this.loading = true
+            this.error = null
+            try {
+                const { data, error } = await supabase
+                    .from('guests')
+                    .select('*')
+                    .order('registered_at', { ascending: false })
 
-            this.guests.push(newGuest)
-            this.saveToLocaleStorage()
-            return newGuest
+                if (error) throw error
+                this.guests = data || []
+            } catch (err) {
+                console.error('Error fetching guests:', err)
+                this.error = err.message
+            } finally {
+                this.loading = false
+            }
         },
 
-        checkInGuest(guestId) {
+        async registerGuest(firstName, lastName, email) {
+            this.loading = true
+            this.error = null
+            try {
+                const { data, error } = await supabase
+                    .from('guests')
+                    .insert([
+                        {
+                            first_name: firstName,
+                            last_name: lastName,
+                            email: email,
+                            scanned: false
+                        }
+                    ])
+                    .select()
+                    .single()
+
+                if (error) throw error
+
+                // Add to local state
+                this.guests.unshift(data)
+                return data
+            } catch (err) {
+                console.error('Error registering guest:', err)
+                this.error = err.message
+                throw err
+            } finally {
+                this.loading = false
+            }
+        },
+
+        async checkInGuest(guestId) {
             const cleanId = guestId.trim()
-            // Recherche par ID complet ou par les 8 premiers caractères (ce qui est affiché à l'utilisateur)
-            const guest = this.guests.find(g => g.id === cleanId || g.id.substring(0, 8) === cleanId)
+
+            // Find guest by full ID or first 8 characters
+            let guest = this.guests.find(g => g.id === cleanId || g.id.substring(0, 8) === cleanId)
+
+            // If not in local state, try to fetch from database
+            if (!guest) {
+                try {
+                    const { data } = await supabase
+                        .from('guests')
+                        .select('*')
+                        .or(`id.eq.${cleanId},id.like.${cleanId}%`)
+                        .single()
+
+                    if (data) {
+                        guest = data
+                        // Add to local state if not present
+                        if (!this.guests.find(g => g.id === guest.id)) {
+                            this.guests.push(guest)
+                        }
+                    }
+                } catch (err) {
+                    console.error('Error fetching guest:', err)
+                }
+            }
 
             if (!guest) {
                 this.currentScanResult = {
@@ -40,33 +99,85 @@ export const useGuestStore = defineStore('guest', {
             if (guest.scanned) {
                 this.currentScanResult = {
                     success: false,
-                    fullName: `${guest.firstName} ${guest.lastName}`,
+                    fullName: `${guest.first_name} ${guest.last_name}`,
                     message: 'Cet invité a déjà été scanné !',
                     status: 'warning'
                 }
                 return false
             }
 
-            // Success
-            guest.scanned = true
-            guest.scannedAt = new Date().toISOString()
-            this.saveToLocaleStorage()
+            // Update in database
+            try {
+                const { error } = await supabase
+                    .from('guests')
+                    .update({
+                        scanned: true,
+                        scanned_at: new Date().toISOString()
+                    })
+                    .eq('id', guest.id)
 
-            this.currentScanResult = {
-                success: true,
-                fullName: `${guest.firstName} ${guest.lastName}`,
-                message: 'Entrée confirmée. Bienvenue !',
-                status: 'success'
+                if (error) throw error
+
+                // Update local state
+                const index = this.guests.findIndex(g => g.id === guest.id)
+                if (index !== -1) {
+                    this.guests[index].scanned = true
+                    this.guests[index].scanned_at = new Date().toISOString()
+                }
+
+                this.currentScanResult = {
+                    success: true,
+                    fullName: `${guest.first_name} ${guest.last_name}`,
+                    message: 'Entrée confirmée. Bienvenue !',
+                    status: 'success'
+                }
+                return true
+            } catch (err) {
+                console.error('Error checking in guest:', err)
+                this.currentScanResult = {
+                    success: false,
+                    message: 'Erreur lors de la validation. Réessayez.',
+                    status: 'error'
+                }
+                return false
             }
-            return true
         },
 
         clearScanResult() {
             this.currentScanResult = null
         },
 
-        saveToLocaleStorage() {
-            localStorage.setItem('event_guests', JSON.stringify(this.guests))
+        // Real-time subscription
+        subscribeToGuests() {
+            const channel = supabase
+                .channel('guests-changes')
+                .on(
+                    'postgres_changes',
+                    { event: '*', schema: 'public', table: 'guests' },
+                    (payload) => {
+                        console.log('Change received!', payload)
+
+                        if (payload.eventType === 'INSERT') {
+                            // Add new guest to the beginning
+                            this.guests.unshift(payload.new)
+                        } else if (payload.eventType === 'UPDATE') {
+                            // Update existing guest
+                            const index = this.guests.findIndex(g => g.id === payload.new.id)
+                            if (index !== -1) {
+                                this.guests[index] = payload.new
+                            }
+                        } else if (payload.eventType === 'DELETE') {
+                            // Remove deleted guest
+                            const index = this.guests.findIndex(g => g.id === payload.old.id)
+                            if (index !== -1) {
+                                this.guests.splice(index, 1)
+                            }
+                        }
+                    }
+                )
+                .subscribe()
+
+            return channel
         }
     }
 })
